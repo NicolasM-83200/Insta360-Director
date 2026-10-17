@@ -1,0 +1,11 @@
+NOUVEAUTÉ : ouvrir README_ETAPE_B.md.
+Le README.md original concerne uniquement A et reste inchangé.
+
+Installation Python 3.12 :
+py -3.12 -m venv .venv
+.venv\Scripts\python.exe -m pip install -r requirements-step2.txt
+
+Ouvrir le panorama déjà fourni :
+.venv\Scripts\python.exe step2.py --project exemple_panorama_fourni
+
+Les cinq rôles attendent vos clics. La source vidéo reste sur votre PC.

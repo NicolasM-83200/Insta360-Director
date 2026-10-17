@@ -1,0 +1,10 @@
+{
+  "description": "Cinq repères géométriques de calibration, sans identification de musiciens. Ajuster manuellement après inspection.",
+  "views": [
+    {"id": "angle_01", "subject": null, "yaw": -144, "pitch": 0, "h_fov": 90},
+    {"id": "angle_02", "subject": null, "yaw": -72, "pitch": 0, "h_fov": 90},
+    {"id": "angle_03", "subject": null, "yaw": 0, "pitch": 0, "h_fov": 90},
+    {"id": "angle_04", "subject": null, "yaw": 72, "pitch": 0, "h_fov": 90},
+    {"id": "angle_05", "subject": null, "yaw": 144, "pitch": 0, "h_fov": 90}
+  ]
+}

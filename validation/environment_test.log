@@ -1,0 +1,5 @@
+2026-10-11 17:20:29,495 INFO Commande: /usr/bin/ffmpeg -version
+2026-10-11 17:20:29,536 INFO Commande: /usr/bin/ffprobe -version
+2026-10-11 17:20:29,575 INFO Commande: /usr/bin/ffmpeg -hide_banner -filters
+2026-10-11 17:20:29,616 INFO Commande: /usr/bin/ffmpeg -hide_banner -loglevel error -f lavfi -i color=c=black:s=128x64:d=0.1 -vf v360=input=e:output=flat:w=64:h=36:h_fov=90:v_fov=58.7155 -frames:v 1 -threads 1 -f null -
+2026-10-11 17:20:29,660 INFO Rapport: /workspace/scratch/67430fb8bf03/test_outputs/run_20261011_172029_2ed1284f/report.json

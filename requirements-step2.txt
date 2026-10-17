@@ -1,0 +1,4 @@
+# Dépendances additionnelles de B ; A reste sans dépendance externe.
+numpy>=1.26.4,<3
+Pillow>=10.4,<13
+# tkinter est fourni par l'installateur officiel Python Windows (option Tcl/Tk).

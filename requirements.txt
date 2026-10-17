@@ -1,0 +1,3 @@
+# Étape 1 : bibliothèque standard Python uniquement (Python >= 3.10).
+# FFmpeg et FFprobe sont des exécutables externes, pas des paquets pip.
+# OpenCV et librosa ne sont pas requis à cette étape et ne sont pas installés.

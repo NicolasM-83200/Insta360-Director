@@ -1,0 +1,30 @@
+test_five_views_and_rectilinear_fov (test_step1.ConfigurationTests.test_five_views_and_rectilinear_fov) ... ok
+test_reject_nan (test_step1.ConfigurationTests.test_reject_nan) ... ok
+test_sampling_excludes_end (test_step1.ConfigurationTests.test_sampling_excludes_end) ... ok
+test_full_pipeline_source_preserved (test_step1.IntegrationTests.test_full_pipeline_source_preserved) ... ok
+test_projection_confirmation_required (test_step1.IntegrationTests.test_projection_confirmation_required) ... ok
+test_reject_non_video (test_step1.IntegrationTests.test_reject_non_video) ... ok
+test_reject_out_of_range (test_step1.IntegrationTests.test_reject_out_of_range) ... ok
+test_reject_wrong_ratio (test_step1.IntegrationTests.test_reject_wrong_ratio) ... ok
+test_cache_five_clips_audio_and_source_untouched (test_step2.FFmpegTests.test_cache_five_clips_audio_and_source_untouched) ... ok
+test_experimental_v360_signs_rotation_and_seam (test_step2.FFmpegTests.test_experimental_v360_signs_rotation_and_seam) ... ok
+test_reject_unvalidated_and_source_mismatch (test_step2.FFmpegTests.test_reject_unvalidated_and_source_mismatch) ... ok
+test_box_across_seam (test_step2.GeometryTests.test_box_across_seam) ... ok
+test_box_reverse_drag_same_result (test_step2.GeometryTests.test_box_reverse_drag_same_result) ... ok
+test_cardinals (test_step2.GeometryTests.test_cardinals) ... ok
+test_fov_contains_box (test_step2.GeometryTests.test_fov_contains_box) ... ok
+test_nan_and_invalid_latitude (test_step2.GeometryTests.test_nan_and_invalid_latitude) ... ok
+test_roundtrips_and_poles (test_step2.GeometryTests.test_roundtrips_and_poles) ... ok
+test_seam_equivalence (test_step2.GeometryTests.test_seam_equivalence) ... ok
+test_too_wide_box_flagged (test_step2.GeometryTests.test_too_wide_box_flagged) ... ok
+test_change_invalidates_reviews (test_step2.ProjectTests.test_change_invalidates_reviews) ... ok
+test_new_reference_requires_review (test_step2.ProjectTests.test_new_reference_requires_review) ... ok
+test_no_fictitious_assignments (test_step2.ProjectTests.test_no_fictitious_assignments) ... ok
+test_reference_tampering_detected (test_step2.ProjectTests.test_reference_tampering_detected) ... ok
+test_reject_fake_ai (test_step2.ProjectTests.test_reject_fake_ai) ... ok
+test_save_reload_coordinates_and_a_compatibility (test_step2.ProjectTests.test_save_reload_coordinates_and_a_compatibility) ... ok
+
+----------------------------------------------------------------------
+Ran 25 tests in 8.089s
+
+OK

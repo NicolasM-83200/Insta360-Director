@@ -1,0 +1,17 @@
+Validation de livraison — 2026-10-11
+Environnement d'exécution : Linux ; aucune validation Windows exécutée ici.
+Commande : python3 -m unittest discover -s insta360_etape1/tests -v
+Résultat réel : Ran 8 tests in 2.114s — OK (8 réussis, aucun ignoré).
+
+- cinq vues et calcul du champ vertical : OK
+- échantillonnage et exclusion de la borne finale : OK
+- rejet NaN : OK
+- pipeline réel FFmpeg, contrôle décodage intégral, dimensions des 12 PNG,
+  galerie et SHA-256 de la source inchangé : OK
+- confirmation de projection obligatoire : OK
+- rejet du temps hors vidéo : OK
+- rejet d'un fichier texte déguisé en MP4 : OK
+- rejet d'une source au ratio 16:9 : OK
+
+Le fichier environment_test.log contient un diagnostic exécuté réellement.
+Pas de vidéo utilisateur disponible. Les tests utilisent une mire synthétique.

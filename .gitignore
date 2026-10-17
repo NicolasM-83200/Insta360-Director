@@ -1,0 +1,42 @@
+# Environnements et caches Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# Secrets et configuration locale
+.env
+.env.*
+!.env.example
+
+# Rushs et exports video : ne jamais les versionner
+*.[iI][nN][sS][vV]
+*.[mM][pP]4
+*.[mM][oO][vV]
+*.[mM][kK][vV]
+*.[aA][vV][iI]
+*.[mM]4[vV]
+
+# Resultats generes ; conserver validation/ et validation_b/
+/outputs/
+/mappings/
+cache/
+clips_*/
+previews_*/
+conventions_*/
+step2.log
+musiciens.previous.json
+*.tmp
+
+# Fichiers du systeme
+Thumbs.db
+Desktop.ini
+.DS_Store

@@ -1,0 +1,111 @@
+{
+  "ffmpeg": "ffmpeg version 6.1.1-3ubuntu5 Copyright (c) 2000-2023 the FFmpeg developers",
+  "synthetic_test": true,
+  "status": "passed",
+  "cases": [
+    {
+      "yaw": 0,
+      "pitch": 0,
+      "h_fov": 70,
+      "mean_absolute_error_8bit": 0.151448913673316,
+      "p99_error_8bit": 1.0,
+      "center_error_8bit": 1.0000000000000142,
+      "expected_center_uv": [
+        0.5,
+        0.5
+      ],
+      "passed": true
+    },
+    {
+      "yaw": 90,
+      "pitch": 0,
+      "h_fov": 70,
+      "mean_absolute_error_8bit": 0.17440893157318005,
+      "p99_error_8bit": 1.0,
+      "center_error_8bit": 0.9999999999999858,
+      "expected_center_uv": [
+        0.75,
+        0.5
+      ],
+      "passed": true
+    },
+    {
+      "yaw": -90,
+      "pitch": 0,
+      "h_fov": 70,
+      "mean_absolute_error_8bit": 0.17418518327280655,
+      "p99_error_8bit": 1.0,
+      "center_error_8bit": 1.0,
+      "expected_center_uv": [
+        0.25,
+        0.5
+      ],
+      "passed": true
+    },
+    {
+      "yaw": 0,
+      "pitch": 45,
+      "h_fov": 70,
+      "mean_absolute_error_8bit": 0.13032477926369598,
+      "p99_error_8bit": 1.0,
+      "center_error_8bit": 1.0000000000000142,
+      "expected_center_uv": [
+        0.5,
+        0.25
+      ],
+      "passed": true
+    },
+    {
+      "yaw": 90,
+      "pitch": 35,
+      "h_fov": 95,
+      "mean_absolute_error_8bit": 0.17096091289306553,
+      "p99_error_8bit": 1.0,
+      "center_error_8bit": 0.9999999999999858,
+      "expected_center_uv": [
+        0.75,
+        0.3055555555555556
+      ],
+      "passed": true
+    },
+    {
+      "yaw": 179,
+      "pitch": -25,
+      "h_fov": 90,
+      "mean_absolute_error_8bit": 0.18743796721800543,
+      "p99_error_8bit": 1.0,
+      "center_error_8bit": 0.9847695156391296,
+      "expected_center_uv": [
+        0.9972222222222222,
+        0.6388888888888888
+      ],
+      "passed": true
+    },
+    {
+      "yaw": -179,
+      "pitch": 30,
+      "h_fov": 110,
+      "mean_absolute_error_8bit": 0.16901028668468127,
+      "p99_error_8bit": 1.0,
+      "center_error_8bit": 1.0,
+      "expected_center_uv": [
+        0.002777777777777778,
+        0.3333333333333333
+      ],
+      "passed": true
+    },
+    {
+      "yaw": 35,
+      "pitch": 80,
+      "h_fov": 45,
+      "mean_absolute_error_8bit": 0.12363527879611941,
+      "p99_error_8bit": 1.0,
+      "center_error_8bit": 1.166666666666666,
+      "expected_center_uv": [
+        0.5972222222222222,
+        0.05555555555555555
+      ],
+      "passed": true
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+Import effectué depuis les report.json, references.json, probe.json et panorama.png réels fournis : OK.
+Relecture de musiciens.json et intégrité du panorama : OK.
+Une référence à 10 s ; cinq rôles non attribués.
+8 fichiers A intacts (SHA-256).
+Interface Tk non exécutée : pas de serveur graphique disponible.
