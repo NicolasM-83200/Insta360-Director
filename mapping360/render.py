@@ -11,7 +11,9 @@ import numpy as np
 from PIL import Image
 import step1
 from .geometry import preview_rgb, finite, uv_to_angles
-from .project import atomic_json, validate_document
+from .project import atomic_json, validate_document, migrate_document
+from .profiles import camera_output, output_for_size, projection_filter, preview_size
+from .preview import render_preview
 
 LOG = logging.getLogger('step2')
 
@@ -115,7 +117,8 @@ def export_previews(project):
             if cam['yaw'] is None:
                 continue
             name = ref['id'] + '_' + cam['id'] + '.png'
-            rgb = preview_rgb(pano, cam['yaw'], cam['pitch'], cam['h_fov'], 960, 540)
+            w, h = preview_size(camera_output(cam), 960)
+            rgb = render_preview(pano, cam, w, h)
             Image.fromarray(rgb).save(root / name)
             manifest['images'].append({'file': name, 'reference_id': ref['id'], 'camera_id': cam['id'],
                                        'requested_time_seconds': ref['requested_time_seconds'],
@@ -125,20 +128,27 @@ def export_previews(project):
 
 
 def export_clips(document, output_parent, start, duration=5, ffmpeg='ffmpeg', ffprobe='ffprobe',
-                 width=1280, height=720, progress=None):
+                 width=None, height=None, progress=None, camera_ids=None):
     """Cinq plans fixes depuis le fichier source; aucune lecture du panorama pour le rendu.
     Extraits autonomes H.264/AAC. Pas d'assemblage ni de timeline à cette étape.
     """
-    validate_document(document)
-    if any(not cam['validated'] for cam in document['cameras']):
+    document = validate_document(migrate_document(document))
+    cameras = selected_cameras(document, camera_ids)
+    if camera_ids is None and any(not cam['validated'] for cam in cameras):
         raise ValueError('Valider manuellement les cinq caméras avant de rendre les extraits.')
     start, duration = finite(start), finite(duration)
     if not 0 < duration <= 30:
         raise ValueError('Durée des extraits entre 0 et 30 secondes.')
-    if not (width >= 160 and height >= 90 and width <= 3840 and width % 2 == height % 2 == 0
-            and width * 9 == height * 16):
-        raise ValueError('Résolution paire 16:9 requise (maximum 3840 pixels de large).')
+    if (width is None) != (height is None):
+        raise ValueError('Fournir largeur ET hauteur.')
+    if width is not None:
+        override = output_for_size(width, height)
+        for cam in cameras:
+            if override['format'] != cam['output']['format']:
+                raise ValueError('La résolution demandée doit conserver le ratio du cadrage sauvegardé.')
+            cam['output'] = copy.deepcopy(override)
     source, info = checked_source(document, ffprobe)
+    document['source'] = info
     if start < 0 or start + duration > info['duration_seconds']:
         raise ValueError('Extrait hors de la durée source; réduire début ou durée.')
     ffmpeg = step1.binary(ffmpeg)
@@ -148,27 +158,45 @@ def export_clips(document, output_parent, start, duration=5, ffmpeg='ffmpeg', ff
     report = {'schema_version': 1, 'status': 'running', 'source': info, 'source_resolution_used': [info['width'], info['height']],
               'requested_start_seconds': start, 'requested_duration_seconds': duration,
               'ffmpeg_version': command([ffmpeg, '-version']).splitlines()[0],
-              'output_size': [width, height], 'clips': [], 'audio_policy': 'first_audio_stream_if_present_aac_192k'}
+              'output_sizes': {c['id']: [c['output']['width'], c['output']['height']] for c in cameras},
+              'validation_export': camera_ids is not None,
+              'clips': [], 'audio_policy': 'first_audio_stream_if_present_aac',
+              'export_settings': document['export_settings']}
     before = source.stat()
     atomic_json(folder / 'musiciens.snapshot.json', document)
     try:
-        for index, cam in enumerate(document['cameras']):
+        for index, cam in enumerate(cameras):
+            width, height = cam['output']['width'], cam['output']['height']
             if progress:
-                progress(f'Export {index + 1}/5 : {cam["label"]}')
+                progress(f'Export {index + 1}/{len(cameras)} : {cam["label"]}')
             target = folder / (cam['id'] + '.mp4')
-            vf = step1.projection(cam, width, height)
+            vf = projection_filter(cam, width, height)
+            settings = document['export_settings']
             args = [ffmpeg, '-hide_banner', '-loglevel', 'error', '-xerror', '-nostdin', '-n',
                     '-ss', f'{start:.9f}', '-noautorotate', '-i', source, '-t', f'{duration:.9f}',
                     '-map', f"0:{info['video_stream_index']}", '-map', '0:a:0?', '-sn', '-dn',
                     '-map_metadata', '-1', '-map_chapters', '-1', '-vf', vf,
-                    '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p',
-                    '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', target]
+                    '-c:v', 'libx264', '-preset', settings['preset'], '-crf', str(settings['crf']), '-pix_fmt', 'yuv420p',
+                    '-c:a', 'aac', '-b:a', settings['audio_bitrate'], '-movflags', '+faststart', target]
             command(args, timeout=3600)
             probe = json.loads(command([ffprobe, '-v', 'error', '-show_streams', '-show_format', '-of', 'json', target]))
             video = next(s for s in probe['streams'] if s['codec_type'] == 'video')
             actual = float(video.get('duration') or probe['format']['duration'])
             if video['width'] != width or video['height'] != height or actual <= 0:
                 raise RuntimeError('Sortie invalide.')
+            from fractions import Fraction
+            rate = float(Fraction(video.get('avg_frame_rate', '0/1')))
+            tolerance = max(.1, 2 / rate) if rate > 0 else .2
+            if abs(actual - duration) > tolerance:
+                raise RuntimeError('Durée vidéo différente de la durée demandée.')
+            audio = next((s for s in probe['streams'] if s['codec_type'] == 'audio'), None)
+            if any(s['codec_type'] == 'audio' for s in info['probe']['streams']):
+                if audio is None:
+                    raise RuntimeError('Piste audio manquante dans l’export.')
+                if abs(float(audio.get('start_time', 0))-float(video.get('start_time', 0))) > tolerance:
+                    raise RuntimeError('Décalage des débuts audio/vidéo trop important.')
+                if abs(float(audio.get('duration', actual))-actual) > tolerance:
+                    raise RuntimeError('Durées audio/vidéo incohérentes.')
             report['clips'].append({'camera_id': cam['id'], 'file': target.name, 'command': [str(x) for x in args],
                                     'filter': vf, 'actual_video_duration_seconds': actual, 'probe': probe})
             atomic_json(folder / 'render_report.json', report)
@@ -182,6 +210,63 @@ def export_clips(document, output_parent, start, duration=5, ffmpeg='ffmpeg', ff
         raise
     finally:
         atomic_json(folder / 'render_report.json', report)
+    return folder
+
+
+def selected_cameras(document, camera_ids=None):
+    if camera_ids is not None and (not camera_ids or len(set(camera_ids)) != len(camera_ids)
+                                  or not set(camera_ids) <= {c['id'] for c in document['cameras']}):
+        raise ValueError('Sélection de caméras invalide.')
+    cameras = [c for c in document['cameras'] if camera_ids is None or c['id'] in camera_ids]
+    if any(c['yaw'] is None for c in cameras):
+        raise ValueError('Positionner les caméras sélectionnées avant l’export.')
+    return cameras
+
+
+def export_images(project, reference_id, camera_ids=None, ffmpeg='ffmpeg', ffprobe='ffprobe'):
+    """Final PNGs from the source video, or original panorama for image-only projects.
+
+    A linked but unavailable video is an error, never a silent low-resolution fallback.
+    """
+    doc = validate_document(migrate_document(project.doc))
+    ref = next((r for r in doc['references'] if r['id'] == reference_id), None)
+    if ref is None:
+        raise ValueError('Référence inconnue.')
+    cams = selected_cameras(doc, camera_ids)
+    source, info = checked_source(doc, ffprobe) if doc.get('source') else (project.reference_path(ref), None)
+    before = source.stat()
+    folder = project.root / ('images_' + uuid.uuid4().hex[:8])
+    folder.mkdir()
+    report = {'status': 'running', 'source': info or str(source),
+              'quality': 'source_video' if info else 'supplied_panorama', 'images': []}
+    try:
+        for cam in cams:
+            w, h = cam['output']['width'], cam['output']['height']
+            args = [step1.binary(ffmpeg), '-v', 'error', '-xerror', '-nostdin', '-n']
+            if info:
+                args += ['-ss', str(ref['requested_time_seconds']), '-noautorotate']
+            args += ['-i', str(source)]
+            if info:
+                args += ['-map', f"0:{info['video_stream_index']}"]
+            dest = folder / (cam['id'] + '.png')
+            args += ['-an', '-sn', '-dn', '-vf', projection_filter(cam, w, h),
+                     '-frames:v', '1', '-threads', '1', '-update', '1', str(dest)]
+            command(args)
+            with Image.open(dest) as im:
+                if im.size != (w, h):
+                    raise RuntimeError('Dimensions PNG incorrectes.')
+                im.verify()
+            report['images'].append({'file': dest.name, 'camera': copy.deepcopy(cam),
+                                     'reference_id': reference_id, 'command': args})
+        after = source.stat()
+        if (before.st_size, before.st_mtime_ns) != (after.st_size, after.st_mtime_ns):
+            raise RuntimeError('Source modifiée pendant l’export.')
+        report.update(status='success', source_stat_unchanged=True)
+    except Exception as e:
+        report.update(status='failed', error=str(e))
+        raise
+    finally:
+        atomic_json(folder / 'image_report.json', report)
     return folder
 
 

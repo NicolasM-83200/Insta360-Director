@@ -13,6 +13,7 @@ from mapping360.profiles import (FORMATS, MODES, output_format, preview_size,
                                  projection_filter, max_fov)
 from mapping360.preview import render_preview, framing_warning
 from mapping360.project import Project, new_document, migrate_document, validate_document
+from mapping360.render import attach_source, export_images, export_clips
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -131,3 +132,77 @@ class PersistenceTests(unittest.TestCase):
             self.assertEqual((root/'musiciens.v1.original.json').read_bytes(), original)
             p.save()
             self.assertEqual((root/'musiciens.v1.original.json').read_bytes(), original)
+
+
+@unittest.skipUnless(shutil.which('ffmpeg') and shutil.which('ffprobe'), 'FFmpeg requis')
+class ExportTests(unittest.TestCase):
+    def test_png_mp4_all_formats_modes_and_source_unchanged(self):
+        with tempfile.TemporaryDirectory(prefix='B1 exports é ') as tmp:
+            root = Path(tmp)
+            Image.fromarray(texture(640, 320)).save(root/'pano.png')
+            source = root/'original.mkv'
+            subprocess.run(['ffmpeg','-v','error','-loop','1','-i',str(root/'pano.png'),
+                            '-f','lavfi','-i','sine=frequency=440:sample_rate=48000',
+                            '-t','1','-r','10','-c:v','ffv1','-pix_fmt','bgr0',
+                            '-c:a','pcm_s16le',str(source)],check=True,capture_output=True)
+            digest = hashlib.sha256(source.read_bytes()).hexdigest()
+            p = Project.create(root)
+            p.doc['source'] = attach_source(p.doc, source)
+            ref = p.add_panorama(root/'pano.png', .2)
+            c = p.doc['cameras'][0]
+            p.change_camera(c, 20, 10, 90, roll=12)
+            for name in FORMATS:
+                w,h = preview_size(output_format(name), 188)
+                # H.264 requires even dimensions, while preview pixels need not be even.
+                w,h = w*2,h*2
+                p.set_output(c,name,w,h)
+                for mode in MODES:
+                    with self.subTest(ratio=name,mode=mode):
+                        p.set_projection(c, mode)
+                        images = export_images(p, ref['id'], [c['id']])
+                        with Image.open(images/'chanteur.png') as im:
+                            actual = np.array(im.convert('RGB'))
+                            self.assertEqual(im.size,(w,h))
+                        expected = render_preview(texture(640,320),c,w,h)
+                        self.assertLess(np.abs(actual.astype(float)-expected.astype(float)).mean(),2)
+                        folder = export_clips(p.doc,p.root,.2,.4,camera_ids=[c['id']])
+                        report = json.loads((folder/'render_report.json').read_text(encoding='utf-8'))
+                        self.assertEqual(report['status'],'success')
+                        clip = report['clips'][0]
+                        self.assertIn(str(source),clip['command'])
+                        self.assertNotIn(str(root/'pano.png'),clip['command'])
+                        streams = clip['probe']['streams']
+                        video = next(s for s in streams if s['codec_type']=='video')
+                        audio = next(s for s in streams if s['codec_type']=='audio')
+                        self.assertEqual((video['width'],video['height']),(w,h))
+                        self.assertAlmostEqual(float(video['duration']),.4,delta=.1)
+                        self.assertAlmostEqual(float(audio['start_time']),float(video['start_time']),delta=.05)
+                        # Compare the actual encoded frame, not just dimensions.
+                        raw = subprocess.run(['ffmpeg','-v','error','-i',str(folder/'chanteur.mp4'),
+                                              '-frames:v','1','-f','rawvideo','-pix_fmt','rgb24','-'],
+                                             check=True,capture_output=True).stdout
+                        encoded = np.frombuffer(raw,np.uint8).reshape(h,w,3)
+                        self.assertLess(np.abs(encoded.astype(float)-expected.astype(float)).mean(),6)
+            self.assertEqual(hashlib.sha256(source.read_bytes()).hexdigest(),digest)
+
+    def test_image_only_and_video_without_audio(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            pano = root/'pano.png'
+            Image.fromarray(texture(320,160)).save(pano)
+            p = Project.create(root)
+            ref = p.add_panorama(pano,0)
+            c = p.doc['cameras'][0]
+            p.change_camera(c,0,0,90)
+            p.set_output(c,'1:1',128,128)
+            folder = export_images(p,ref['id'],['chanteur'])
+            report = json.loads((folder/'image_report.json').read_text(encoding='utf-8'))
+            self.assertEqual(report['quality'],'supplied_panorama')
+            source = root/'silent.mkv'
+            subprocess.run(['ffmpeg','-v','error','-loop','1','-i',str(pano),'-t','0.5',
+                            '-r','10','-c:v','ffv1',str(source)],check=True,capture_output=True)
+            p.doc['source'] = attach_source(p.doc,source)
+            folder = export_clips(p.doc,p.root,0,.3,camera_ids=['chanteur'])
+            report = json.loads((folder/'render_report.json').read_text(encoding='utf-8'))
+            self.assertEqual(report['status'],'success')
+            self.assertFalse(any(s['codec_type']=='audio' for s in report['clips'][0]['probe']['streams']))

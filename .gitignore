@@ -31,9 +31,11 @@ dist/
 cache/
 clips_*/
 previews_*/
+images_*/
 conventions_*/
 step2.log
 musiciens.previous.json
+musiciens.v1.original.json
 *.tmp
 
 # Fichiers du systeme
