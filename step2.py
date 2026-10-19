@@ -21,10 +21,15 @@ def parser():
     p.add_argument('--ffprobe',default='ffprobe')
     p.add_argument('--check-conventions',action='store_true',help='Mire réelle FFmpeg, sans interface.')
     p.add_argument('--export-clips',action='store_true',help='Rendre cinq extraits depuis un projet validé, sans interface.')
+    p.add_argument('--export-image',action='store_true',help='PNG final à --time (référence existante).')
+    p.add_argument('--camera', choices=['chanteur','guitariste','bassiste','batteur','groupe'],
+                   help='Exporter seulement cette caméra, même en brouillon, pour validation.')
+    p.add_argument('--format', choices=['16:9','9:16','4:3','3:4','1:1','2.35:1'])
+    p.add_argument('--projection', choices=['Mega','Ultra','Dewarp','Linear'])
     p.add_argument('--start',type=float,default=0)
     p.add_argument('--duration',type=float,default=5)
-    p.add_argument('--width',type=int,default=1280)
-    p.add_argument('--height',type=int,default=720)
+    p.add_argument('--width',type=int)
+    p.add_argument('--height',type=int)
     return p
 
 
@@ -35,11 +40,17 @@ def main(argv=None):
         return 1
     try:
         from mapping360.project import Project
-        from mapping360.render import attach_source,check_conventions,export_clips
+        from mapping360.render import attach_source,check_conventions,export_clips,export_images,extract_reference
     except ImportError as e:
         print(f'Dépendance absente : {e}. Installer requirements-step2.txt.',file=sys.stderr)
         return 1
     try:
+        if args.export_clips and args.export_image:
+            raise ValueError('Choisir --export-clips ou --export-image.')
+        if (args.export_clips or args.export_image) and not args.project:
+            raise ValueError('Les exports requièrent --project.')
+        if (args.width is None) != (args.height is None):
+            raise ValueError('Fournir --width et --height ensemble.')
         if args.check_conventions:
             folder=args.output.resolve()/('conventions_'+uuid.uuid4().hex[:8])
             folder.mkdir(parents=True)
@@ -60,15 +71,32 @@ def main(argv=None):
             if not args.confirm_equirectangular:
                 raise ValueError('Ajouter --confirm-equirectangular pour confirmer la projection source.')
             project.doc['source']=attach_source(project.doc,args.source,args.ffprobe)
+            if not project.doc['references']:
+                time = args.time if args.time is not None else 0
+                path = extract_reference(project.doc,project.root/'cache',time,args.ffmpeg,args.ffprobe)
+                project.add_panorama(path,time,'source_seek_ffmpeg')
             project.save()
+        selected = [c for c in project.doc['cameras'] if args.camera is None or c['id'] == args.camera]
+        for camera in selected:
+            if args.projection:
+                project.set_projection(camera, args.projection)
+            if args.format or args.width is not None:
+                project.set_output(camera, args.format or camera['output']['format'], args.width, args.height)
+        if args.export_image:
+            ref = next((r for r in project.doc['references'] if args.time is not None and abs(r['requested_time_seconds']-args.time)<1e-6),None)
+            if ref is None:
+                raise ValueError('--time doit désigner une référence existante pour le PNG.')
+            print(export_images(project,ref['id'],[args.camera] if args.camera else None,args.ffmpeg,args.ffprobe))
+            return 0
         if args.export_clips:
             if not args.project:
                 raise ValueError('--export-clips requiert --project (cinq caméras validées).')
-            out=export_clips(project.doc,project.root,args.start,args.duration,args.ffmpeg,args.ffprobe,args.width,args.height,print)
+            out=export_clips(project.doc,project.root,args.start,args.duration,args.ffmpeg,args.ffprobe,
+                             progress=print,camera_ids=[args.camera] if args.camera else None)
             print(out)
             return 0
         import tkinter as tk
-        from mapping360.ui import MappingApp
+        from mapping360.ui_studio import MappingApp
         root=tk.Tk()
         MappingApp(root,project,args.ffmpeg,args.ffprobe)
         root.mainloop()

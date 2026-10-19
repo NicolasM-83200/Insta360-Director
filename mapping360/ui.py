@@ -49,7 +49,7 @@ class MappingApp:
         self.root.protocol('WM_DELETE_WINDOW', self.close)
         self.refresh_references()
         self.sync_camera()
-        self.root.after(100, self.poll)
+        self.poll_job = self.root.after(100, self.poll)
 
     @property
     def camera(self):
@@ -185,7 +185,7 @@ class MappingApp:
             except Exception as error:
                 LOG.exception('Opération interrompue')
                 self.say_error(error)
-        self.root.after(100,self.poll)
+        self.poll_job = self.root.after(100,self.poll)
 
     def import_a(self):
         if self.project.doc['references']:
@@ -479,5 +479,8 @@ class MappingApp:
                 except Exception as error:
                     self.say_error(error)
                     return
+        for job in (self.poll_job, self.preview_job, getattr(self, 'preview_poll_id', None)):
+            if job:
+                self.root.after_cancel(job)
         self.executor.shutdown(wait=False)
         self.root.destroy()

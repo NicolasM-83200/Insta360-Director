@@ -225,6 +225,8 @@ class Project:
 
     def change_camera(self, camera, yaw, pitch, fov, fov_origin='manual_adjustment', roll=None):
         angles_to_uv(yaw, pitch)
+        if not -180 <= finite(yaw) <= 180:
+            raise ValueError('Yaw hors limites.')
         output = camera['output']
         vertical_fov(camera['projection']['mode'], fov, output['width'] / output['height'])
         if roll is not None and not -180 <= finite(roll) <= 180:
@@ -241,7 +243,8 @@ class Project:
         old_aspect, aspect = old['width'] / old['height'], output['width'] / output['height']
         mode = camera['projection']['mode']
         # Expand coverage on the changing axis, never silently crop a portrait.
-        fov = scale_fov(mode, lens_scale(mode, camera['h_fov']) * max(1, aspect / old_aspect))
+        fov = (camera['h_fov'] if aspect <= old_aspect else
+               scale_fov(mode, lens_scale(mode, camera['h_fov']) * aspect / old_aspect))
         limited = fov > max_fov(mode, aspect)
         camera.update(output=output, h_fov=min(fov, max_fov(mode, aspect)))
         if name != old['format']:

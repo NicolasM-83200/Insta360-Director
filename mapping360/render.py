@@ -159,6 +159,8 @@ def export_clips(document, output_parent, start, duration=5, ffmpeg='ffmpeg', ff
               'requested_start_seconds': start, 'requested_duration_seconds': duration,
               'ffmpeg_version': command([ffmpeg, '-version']).splitlines()[0],
               'output_sizes': {c['id']: [c['output']['width'], c['output']['height']] for c in cameras},
+              'output_size': ([cameras[0]['output']['width'], cameras[0]['output']['height']]
+                              if all(c['output'] == cameras[0]['output'] for c in cameras) else None),
               'validation_export': camera_ids is not None,
               'clips': [], 'audio_policy': 'first_audio_stream_if_present_aac',
               'export_settings': document['export_settings']}

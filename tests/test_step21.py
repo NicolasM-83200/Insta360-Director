@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 import numpy as np
@@ -86,6 +87,20 @@ class ProfileTests(unittest.TestCase):
         self.assertEqual(c['projection']['mode'], 'Linear')
         self.assertFalse(c['validated'])
 
+    def test_resolution_only_keeps_reviews_and_stage_a_rejects_non_linear(self):
+        p = Project('.', new_document())
+        p.doc['references'] = [{'id':'r','requested_time_seconds':0}]
+        for c in p.doc['cameras']:
+            p.change_camera(c,0,0,70)
+            p.review(c,p.doc['references'][0],'visible')
+            p.validate_camera(c)
+        p.set_output(p.doc['cameras'][0],'16:9',1280,720)
+        validate_document(p.doc)
+        self.assertTrue(p.doc['cameras'][0]['validated'])
+        p.set_projection(p.doc['cameras'][0],'Ultra')
+        with self.assertRaises(ValueError):
+            p.stage_a_views()
+
 
 @unittest.skipUnless(shutil.which('ffmpeg') and shutil.which('ffprobe'), 'FFmpeg requis')
 class ProjectionComparisonTests(unittest.TestCase):
@@ -136,6 +151,37 @@ class PersistenceTests(unittest.TestCase):
 
 @unittest.skipUnless(shutil.which('ffmpeg') and shutil.which('ffprobe'), 'FFmpeg requis')
 class ExportTests(unittest.TestCase):
+    def test_cli_final_sizes_and_no_implicit_project_rewrite(self):
+        with tempfile.TemporaryDirectory(prefix='B1 CLI é ') as tmp:
+            root = Path(tmp)
+            pano = root/'source.png'
+            Image.fromarray(texture(640,320)).save(pano)
+            source = root/'source.mkv'
+            subprocess.run(['ffmpeg','-v','error','-loop','1','-i',str(pano),'-t','0.5',
+                            '-r','10','-c:v','ffv1',str(source)],check=True,capture_output=True)
+            p=Project.create(root)
+            p.doc['source']=attach_source(p.doc,source)
+            p.add_panorama(pano,0)
+            p.change_camera(p.doc['cameras'][0],0,0,70)
+            p.save()
+            before=(p.root/'musiciens.json').read_bytes()
+            for name,(width,height) in FORMATS.items():
+                with self.subTest(format=name):
+                    result=subprocess.run([sys.executable,str(ROOT/'step2.py'),'--project',str(p.root),
+                                           '--export-image','--camera','chanteur','--time','0','--format',name],
+                                          check=True,capture_output=True,encoding='utf-8',errors='replace')
+                    # Paths are ASCII-normalized by resolving the newest unique output folder.
+                    folder=max(p.root.glob('images_*'),key=lambda f:f.stat().st_mtime_ns)
+                    with Image.open(folder/'chanteur.png') as im:
+                        self.assertEqual(im.size,(width,height))
+            subprocess.run([sys.executable,str(ROOT/'step2.py'),'--project',str(p.root),
+                            '--export-clips','--camera','chanteur','--format','9:16','--projection','Ultra',
+                            '--duration','0.2'],check=True,capture_output=True)
+            folder=next(p.root.glob('clips_*'))
+            report=json.loads((folder/'render_report.json').read_text(encoding='utf-8'))
+            self.assertEqual(report['output_size'],[1080,1920])
+            self.assertEqual((p.root/'musiciens.json').read_bytes(),before)
+
     def test_png_mp4_all_formats_modes_and_source_unchanged(self):
         with tempfile.TemporaryDirectory(prefix='B1 exports é ') as tmp:
             root = Path(tmp)
