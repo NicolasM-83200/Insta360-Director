@@ -1,5 +1,11 @@
 # Étape B — cartographie interactive des musiciens
 
+> **Évolution B.1 (0.3.0)** : voir [README_ETAPE_B1.md](README_ETAPE_B1.md) pour
+> l'interface centrale, les six formats, les quatre projections, la migration v2
+> et les exports PNG/MP4 par caméra. Le présent document conserve les instructions
+> et limites historiques de B ; les tailles fixes et le schéma v1 sont remplacés
+> par les paramètres décrits dans le guide B.1.
+
 Cette version **prolonge le projet insta360_etape1**. L'étape A reste exécutable telle quelle. Ouvrir ce document pour B ; `README.md` reste le guide original de A.
 
 ## Ce qui a été examiné avant les modifications

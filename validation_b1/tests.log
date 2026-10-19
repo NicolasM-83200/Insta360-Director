@@ -1,0 +1,43 @@
+test_five_views_and_rectilinear_fov (test_step1.ConfigurationTests.test_five_views_and_rectilinear_fov) ... ok
+test_reject_nan (test_step1.ConfigurationTests.test_reject_nan) ... ok
+test_sampling_excludes_end (test_step1.ConfigurationTests.test_sampling_excludes_end) ... ok
+test_full_pipeline_source_preserved (test_step1.IntegrationTests.test_full_pipeline_source_preserved) ... ok
+test_projection_confirmation_required (test_step1.IntegrationTests.test_projection_confirmation_required) ... ok
+test_reject_non_video (test_step1.IntegrationTests.test_reject_non_video) ... ok
+test_reject_out_of_range (test_step1.IntegrationTests.test_reject_out_of_range) ... ok
+test_reject_wrong_ratio (test_step1.IntegrationTests.test_reject_wrong_ratio) ... ok
+test_cache_five_clips_audio_and_source_untouched (test_step2.FFmpegTests.test_cache_five_clips_audio_and_source_untouched) ... ok
+test_experimental_v360_signs_rotation_and_seam (test_step2.FFmpegTests.test_experimental_v360_signs_rotation_and_seam) ... ok
+test_reject_unvalidated_and_source_mismatch (test_step2.FFmpegTests.test_reject_unvalidated_and_source_mismatch) ... ok
+test_box_across_seam (test_step2.GeometryTests.test_box_across_seam) ... ok
+test_box_reverse_drag_same_result (test_step2.GeometryTests.test_box_reverse_drag_same_result) ... ok
+test_cardinals (test_step2.GeometryTests.test_cardinals) ... ok
+test_fov_contains_box (test_step2.GeometryTests.test_fov_contains_box) ... ok
+test_nan_and_invalid_latitude (test_step2.GeometryTests.test_nan_and_invalid_latitude) ... ok
+test_roundtrips_and_poles (test_step2.GeometryTests.test_roundtrips_and_poles) ... ok
+test_seam_equivalence (test_step2.GeometryTests.test_seam_equivalence) ... ok
+test_too_wide_box_flagged (test_step2.GeometryTests.test_too_wide_box_flagged) ... ok
+test_change_invalidates_reviews (test_step2.ProjectTests.test_change_invalidates_reviews) ... ok
+test_new_reference_requires_review (test_step2.ProjectTests.test_new_reference_requires_review) ... ok
+test_no_fictitious_assignments (test_step2.ProjectTests.test_no_fictitious_assignments) ... ok
+test_reference_tampering_detected (test_step2.ProjectTests.test_reference_tampering_detected) ... ok
+test_reject_fake_ai (test_step2.ProjectTests.test_reject_fake_ai) ... ok
+test_save_reload_coordinates_and_a_compatibility (test_step2.ProjectTests.test_save_reload_coordinates_and_a_compatibility) ... ok
+test_cli_final_sizes_and_no_implicit_project_rewrite (test_step21.ExportTests.test_cli_final_sizes_and_no_implicit_project_rewrite) ... ok
+test_image_only_and_video_without_audio (test_step21.ExportTests.test_image_only_and_video_without_audio) ... ok
+test_png_mp4_all_formats_modes_and_source_unchanged (test_step21.ExportTests.test_png_mp4_all_formats_modes_and_source_unchanged) ... ok
+test_migration_backup_and_all_settings_roundtrip (test_step21.PersistenceTests.test_migration_backup_and_all_settings_roundtrip) ... ok
+test_formats_and_preview_ratio (test_step21.ProfileTests.test_formats_and_preview_ratio) ... ok
+test_four_distinct_projections (test_step21.ProfileTests.test_four_distinct_projections) ... ok
+test_history_restore_does_not_change_subject (test_step21.ProfileTests.test_history_restore_does_not_change_subject) ... ok
+test_ratio_change_preserves_subject_and_annotations (test_step21.ProfileTests.test_ratio_change_preserves_subject_and_annotations) ... ok
+test_resolution_only_keeps_reviews_and_stage_a_rejects_non_linear (test_step21.ProfileTests.test_resolution_only_keeps_reviews_and_stage_a_rejects_non_linear) ... ok
+test_v1_migration_keeps_reference_and_validation (test_step21.ProfileTests.test_v1_migration_keeps_reference_and_validation) ... ok
+test_numpy_against_ffmpeg_all_modes_ratios_and_roll (test_step21.ProjectionComparisonTests.test_numpy_against_ffmpeg_all_modes_ratios_and_roll) ... ok
+test_box_and_all_format_mode_controls (test_ui_step21.StudioUITests.test_box_and_all_format_mode_controls) ... ok
+test_point_drag_zoom_ratio_roll_history_and_preview (test_ui_step21.StudioUITests.test_point_drag_zoom_ratio_roll_history_and_preview) ... ok
+
+----------------------------------------------------------------------
+Ran 38 tests in 52.250s
+
+OK
