@@ -164,7 +164,7 @@ class FFmpegTests(unittest.TestCase):
             p.review(c,ref,'visible')  # Mire synthétique, pas une observation de personne.
             p.validate_camera(c)
         folder=export_clips(p.doc,p.root,.5,1,width=320,height=180)
-        report=json.loads((folder/'render_report.json').read_text())
+        report=json.loads((folder/'render_report.json').read_text(encoding='utf-8'))
         self.assertEqual(report['status'],'success')
         self.assertEqual(len(report['clips']),5)
         for clip in report['clips']:

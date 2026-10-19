@@ -9,7 +9,9 @@ from pathlib import Path
 import shutil
 import uuid
 from PIL import Image
-from .geometry import angles_to_uv, finite
+from .geometry import angles_to_uv, uv_to_angles, finite
+from .profiles import (output_format, MODES, vertical_fov, lens_scale,
+                       scale_fov, max_fov)
 
 LOG = logging.getLogger('step2')
 SUBJECTS = [('chanteur', 'Chanteur', 65), ('guitariste', 'Guitariste', 70),
@@ -36,21 +38,44 @@ def atomic_json(path, data):
 
 
 def new_document():
-    return {'schema_version': 1, 'artifact_type': 'manual_musician_mapping', 'app_version': '0.2.0',
+    return {'schema_version': 2, 'artifact_type': 'manual_musician_mapping', 'app_version': '0.3.0',
             'created_at': now(), 'updated_at': now(), 'annotation_origin': 'manual', 'ai_detections': [],
             'coordinate_system': {'projection': 'equirectangular_mono', 'origin': 'top_left',
                                   'coordinates': 'normalized_pixel_edges', 'pixel_center': '(i+0.5)/size',
                                   'yaw': '360*u-180, wrapped [-180,180)', 'pitch': '90-180*v',
-                                  'rotation_order': 'ypr', 'roll': 0, 'output_aspect': '16:9'},
+                                  'rotation_order': 'ypr', 'output_aspect': 'per_camera'},
+            'export_settings': {'crf': 20, 'preset': 'veryfast', 'audio_bitrate': '192k'},
             'source': None, 'references': [], 'cameras': [
                 {'id': sid, 'label': label, 'annotation_origin': 'manual', 'ai_detection': None,
                  'yaw': None, 'pitch': None, 'center_uv': None, 'h_fov': fov, 'fov_origin': 'preset_to_validate',
-                 'validated': False, 'annotations': [], 'reviews': []}
+                 'roll': 0, 'projection': {'mode': 'Linear'}, 'output': output_format(),
+                 'saved_framings': [], 'validated': False, 'annotations': [], 'reviews': []}
                 for sid, label, fov in SUBJECTS]}
 
 
 def signature(camera):
-    return json.dumps([camera['yaw'], camera['pitch'], camera['h_fov']], separators=(',', ':'))
+    output = camera.get('output', output_format('16:9', 1280, 720))
+    return json.dumps([camera['yaw'], camera['pitch'], camera['h_fov'], camera.get('roll', 0),
+                       camera.get('projection', {}).get('mode', 'Linear'), output['format']], separators=(',', ':'))
+
+
+def migrate_document(document):
+    """Copy-on-load migration; the file is never changed until explicit save."""
+    doc = copy.deepcopy(document)
+    if doc.get('schema_version') != 1:
+        return doc
+    for cam in doc['cameras']:
+        old_signature = json.dumps([cam['yaw'], cam['pitch'], cam['h_fov']], separators=(',', ':'))
+        cam.update(roll=0, projection={'mode': 'Linear'},
+                   output=output_format('16:9', 1280, 720), saved_framings=[])
+        for review in cam['reviews']:
+            if review.get('framing_signature') == old_signature:
+                review['framing_signature'] = signature(cam)
+    doc.update(schema_version=2, app_version='0.3.0', migrated_from=1,
+               export_settings={'crf': 20, 'preset': 'veryfast', 'audio_bitrate': '192k'})
+    doc['coordinate_system']['output_aspect'] = 'per_camera'
+    doc['coordinate_system'].pop('roll', None)
+    return doc
 
 
 def review_complete(camera, references):
@@ -60,8 +85,13 @@ def review_complete(camera, references):
 
 
 def validate_document(doc):
-    if doc.get('schema_version') != 1 or doc.get('artifact_type') != 'manual_musician_mapping':
+    if doc.get('schema_version') != 2 or doc.get('artifact_type') != 'manual_musician_mapping':
         raise ValueError('Format musiciens.json inconnu.')
+    settings = doc['export_settings']
+    if type(settings['crf']) is not int or not 0 <= settings['crf'] <= 51:
+        raise ValueError('CRF entier entre 0 et 51 requis.')
+    if settings['preset'] not in ('ultrafast', 'veryfast', 'fast', 'medium', 'slow') or settings['audio_bitrate'] not in ('128k', '192k', '256k', '320k'):
+        raise ValueError('Paramètres d’encodage inconnus.')
     cameras = doc.get('cameras', [])
     if [c.get('id') for c in cameras] != [s[0] for s in SUBJECTS]:
         raise ValueError('Les cinq identifiants stables sont requis dans leur ordre initial.')
@@ -81,8 +111,16 @@ def validate_document(doc):
             angles_to_uv(c['yaw'], c['pitch'])
             if not -180 <= finite(c['yaw']) <= 180:
                 raise ValueError('Yaw hors limites.')
-        if not 10 <= finite(c['h_fov']) <= 160:
-            raise ValueError('Champ horizontal hors limites.')
+        output = output_format(c['output']['format'], c['output']['width'], c['output']['height'])
+        vertical_fov(c['projection']['mode'], c['h_fov'], output['width'] / output['height'])
+        if not -180 <= finite(c['roll']) <= 180:
+            raise ValueError('Roll hors limites.')
+        if type(c['validated']) is not bool:
+            raise ValueError('Validation booléenne requise.')
+        for annotation in c['annotations']:
+            if annotation['reference_id'] not in ref_ids:
+                raise ValueError('Référence d’annotation inconnue.')
+            uv_to_angles(annotation['point']['u'], annotation['point']['v'])
         for review in c['reviews']:
             if review['reference_id'] not in ref_ids or review['visibility'] not in VISIBILITY:
                 raise ValueError('Observation manuelle invalide.')
@@ -94,7 +132,7 @@ def validate_document(doc):
 class Project:
     def __init__(self, root, document):
         self.root = Path(root).resolve()
-        self.doc = validate_document(document)
+        self.doc = validate_document(migrate_document(document))
         self.dirty = False
 
     @classmethod
@@ -130,6 +168,10 @@ class Project:
         # Une sauvegarde précédente reste disponible ; aucune écriture dans la source ni dans A.
         dest = self.root / 'musiciens.json'
         if dest.exists():
+            if read_json(dest).get('schema_version') == 1:
+                backup = self.root / 'musiciens.v1.original.json'
+                if not backup.exists():
+                    shutil.copy2(dest, backup)
             shutil.copy2(dest, self.root / 'musiciens.previous.json')
         atomic_json(dest, self.doc)
         self.dirty = False
@@ -181,12 +223,64 @@ class Project:
             self.add_panorama(path, sample['requested_time_seconds'], 'stage_a')
         self.save()
 
-    def change_camera(self, camera, yaw, pitch, fov, fov_origin='manual_adjustment'):
+    def change_camera(self, camera, yaw, pitch, fov, fov_origin='manual_adjustment', roll=None):
         angles_to_uv(yaw, pitch)
-        if not 10 <= finite(fov) <= 160:
-            raise ValueError('FOV hors limites.')
+        output = camera['output']
+        vertical_fov(camera['projection']['mode'], fov, output['width'] / output['height'])
+        if roll is not None and not -180 <= finite(roll) <= 180:
+            raise ValueError('Roll hors limites.')
         u, v = angles_to_uv(yaw, pitch)
         camera.update(yaw=float(yaw), pitch=float(pitch), center_uv={'u': u, 'v': v}, h_fov=float(fov), fov_origin=fov_origin, validated=False)
+        if roll is not None:
+            camera['roll'] = float(roll)
+        self.dirty = True
+
+    def set_output(self, camera, name, width=None, height=None):
+        output = output_format(name, width, height)
+        old = camera['output']
+        old_aspect, aspect = old['width'] / old['height'], output['width'] / output['height']
+        mode = camera['projection']['mode']
+        # Expand coverage on the changing axis, never silently crop a portrait.
+        fov = scale_fov(mode, lens_scale(mode, camera['h_fov']) * max(1, aspect / old_aspect))
+        limited = fov > max_fov(mode, aspect)
+        camera.update(output=output, h_fov=min(fov, max_fov(mode, aspect)))
+        if name != old['format']:
+            camera['validated'] = False
+        self.dirty = True
+        return 'Limite de projection atteinte : vérifier la zone du sujet.' if limited else ''
+
+    def set_projection(self, camera, mode):
+        if mode not in MODES:
+            raise ValueError('Projection inconnue.')
+        if mode == camera['projection']['mode']:
+            return
+        output = camera['output']
+        camera.update(projection={'mode': mode},
+                      h_fov=min(MODES[mode]['default_fov'], max_fov(mode, output['width']/output['height'])),
+                      fov_origin='projection_preset', validated=False)
+        self.dirty = True
+
+    def remember_framing(self, camera, label=''):
+        if camera['yaw'] is None:
+            raise ValueError('Positionner la caméra avant de mémoriser son cadrage.')
+        keys = ('yaw', 'pitch', 'roll', 'h_fov', 'projection', 'output', 'fov_origin')
+        entry = {key: copy.deepcopy(camera[key]) for key in keys}
+        entry.update(label=label or now(), saved_at=now())
+        camera['saved_framings'].append(entry)
+        self.dirty = True
+        return entry
+
+    def restore_framing(self, camera, index=-1):
+        entry = camera['saved_framings'][index]
+        candidate = copy.deepcopy(camera)
+        for key in ('yaw', 'pitch', 'roll', 'h_fov', 'projection', 'output', 'fov_origin'):
+            candidate[key] = copy.deepcopy(entry[key])
+        u, v = angles_to_uv(candidate['yaw'], candidate['pitch'])
+        candidate.update(center_uv={'u': u, 'v': v}, validated=False)
+        doc = copy.deepcopy(self.doc)
+        doc['cameras'][[c['id'] for c in doc['cameras']].index(camera['id'])] = candidate
+        validate_document(doc)
+        camera.update(candidate)
         self.dirty = True
 
     def annotate(self, camera, ref, u, v, bbox=None):
@@ -217,5 +311,7 @@ class Project:
     def stage_a_views(self):
         if any(c['yaw'] is None for c in self.doc['cameras']):
             raise ValueError('Positionner les cinq caméras avant cet export.')
+        if any(c['projection']['mode'] != 'Linear' or c['roll'] != 0 or c['output']['format'] != '16:9' for c in self.doc['cameras']):
+            raise ValueError('A accepte uniquement Linear, roll nul et 16:9. Les cadrages B.1 sont conservés.')
         return {'views': [{'id': c['id'], 'subject': c['label'], 'yaw': c['yaw'],
                            'pitch': c['pitch'], 'h_fov': c['h_fov']} for c in self.doc['cameras']]}
